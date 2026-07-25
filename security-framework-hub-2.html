@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEC://HUB — Bug Bounty · SOC · Red Team</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0e17;
+    --surface: #111827;
+    --border: #1f2d3d;
+    --accent: #00ff88;
+    --accent2: #00cfff;
+    --danger: #ff4444;
+    --warn: #ffaa00;
+    --purple: #b388ff;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,136,0.015) 2px, rgba(0,255,136,0.015) 4px);
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ---------- top-level world nav ---------- */
+  .world-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.8rem 1.5rem;
+    background: rgba(10,14,23,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .world-logo {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-right: 1rem;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .world-btn {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.45rem 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+  .world-btn:hover { color: var(--text); border-color: var(--muted); }
+  .world-btn.active-bb { color: var(--accent); border-color: var(--accent); background: rgba(0,255,136,0.08); }
+  .world-btn.active-soc { color: var(--accent2); border-color: var(--accent2); background: rgba(0,207,255,0.08); }
+  .world-btn.active-rt { color: var(--danger); border-color: var(--danger); background: rgba(255,68,68,0.08); }
+
+  header {
+    padding: 2rem 1.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  .terminal-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; }
+  .dot.y { background: #febc2e; }
+  .dot.g { background: #28c840; }
+
+  .terminal-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-left: 0.5rem;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    letter-spacing: 0.05em;
+  }
+  h1.c-bb { color: var(--accent); text-shadow: 0 0 20px rgba(0,255,136,0.4); }
+  h1.c-soc { color: var(--accent2); text-shadow: 0 0 20px rgba(0,207,255,0.4); }
+  h1.c-rt { color: var(--danger); text-shadow: 0 0 20px rgba(255,68,68,0.4); }
+
+  .subtitle {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+    font-family: var(--mono);
+  }
+
+  .blink { animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .progress-wrap {
+    padding: 1rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .progress-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    margin-bottom: 0.4rem;
+    display: flex;
+    justify-content: space-between;
+  }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px rgba(0,255,136,0.5);
+  }
+
+  .phase-nav {
+    display: flex;
+    overflow-x: auto;
+    padding: 1rem 1.5rem 0;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  .phase-nav::-webkit-scrollbar { display: none; }
+
+  .phase-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px 6px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    background: transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    position: relative;
+    bottom: -1px;
+  }
+  .phase-tab:hover { color: var(--text); border-color: var(--accent); }
+  .phase-tab.active { background: var(--surface); color: var(--accent); border-color: var(--accent); border-bottom-color: var(--surface); }
+  .world-soc .phase-tab.active { color: var(--accent2); border-color: var(--accent2); }
+  .world-rt .phase-tab.active { color: var(--danger); border-color: var(--danger); }
+  .phase-num { font-size: 0.65rem; opacity: 0.6; }
+
+  .content { padding: 1.5rem; max-width: 900px; margin: 0 auto; padding-bottom: 6rem; }
+
+  .phase-panel { display: none; }
+  .phase-panel.active { display: block; }
+
+  .phase-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
+  .phase-icon { font-size: 2rem; flex-shrink: 0; }
+  .phase-title { font-family: var(--mono); font-size: 1.1rem; color: var(--accent); }
+  .world-soc .phase-title { color: var(--accent2); }
+  .world-rt .phase-title { color: var(--danger); }
+  .phase-desc { font-size: 0.82rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.5; }
+
+  .checklist { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem; }
+  .check-item {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; cursor: pointer; transition: all 0.2s; user-select: none;
+  }
+  .check-item:hover { border-color: var(--accent); }
+  .check-item.done { border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.04); }
+
+  .checkbox {
+    width: 18px; height: 18px; border: 1px solid var(--muted); border-radius: 3px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.7rem;
+    transition: all 0.2s; margin-top: 1px;
+  }
+  .check-item.done .checkbox { background: var(--accent); border-color: var(--accent); color: #000; }
+
+  .check-text { flex: 1; }
+  .check-title { font-size: 0.85rem; font-weight: 600; line-height: 1.3; }
+  .check-item.done .check-title { color: var(--muted); text-decoration: line-through; }
+  .check-tool { font-family: var(--mono); font-size: 0.68rem; color: var(--accent2); margin-top: 0.2rem; }
+
+  .severity {
+    font-family: var(--mono); font-size: 0.62rem; padding: 0.1rem 0.4rem; border-radius: 3px;
+    font-weight: 700; letter-spacing: 0.05em; flex-shrink: 0;
+  }
+  .sev-critical { background: rgba(255,68,68,0.15); color: #ff4444; border: 1px solid #ff4444; }
+  .sev-high { background: rgba(255,100,0,0.15); color: #ff6400; border: 1px solid #ff6400; }
+  .sev-medium { background: rgba(255,170,0,0.15); color: #ffaa00; border: 1px solid #ffaa00; }
+  .sev-low { background: rgba(0,207,255,0.15); color: #00cfff; border: 1px solid #00cfff; }
+
+  .tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 1.5rem; }
+  .tool-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.6rem 0.8rem; font-family: var(--mono); font-size: 0.72rem; color: var(--accent2);
+    text-align: center; transition: all 0.2s;
+  }
+  .tool-card:hover { border-color: var(--accent2); box-shadow: 0 0 8px rgba(0,207,255,0.2); }
+  .tool-purpose { font-family: var(--sans); font-size: 0.65rem; color: var(--muted); margin-top: 0.2rem; }
+
+  .report-block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
+  .report-block-header {
+    padding: 0.6rem 1rem; background: rgba(0,255,136,0.05); border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 0.72rem; color: var(--accent); display: flex; align-items: center; gap: 0.5rem;
+  }
+  .report-block textarea {
+    width: 100%; background: transparent; border: none; color: var(--text); font-family: var(--sans);
+    font-size: 0.82rem; padding: 0.8rem 1rem; resize: vertical; outline: none; line-height: 1.6; min-height: 60px;
+  }
+  .report-block textarea::placeholder { color: var(--muted); font-style: italic; }
+
+  .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  .btn { padding: 0.6rem 1.2rem; border-radius: 6px; border: 1px solid; font-family: var(--mono); font-size: 0.75rem; cursor: pointer; transition: all 0.2s; letter-spacing: 0.03em; }
+  .btn-primary { background: rgba(0,255,136,0.1); border-color: var(--accent); color: var(--accent); }
+  .btn-primary:hover { background: rgba(0,255,136,0.2); box-shadow: 0 0 12px rgba(0,255,136,0.3); }
+  .btn-secondary { background: transparent; border-color: var(--border); color: var(--muted); }
+  .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+  .stats-bar {
+    display: flex; gap: 1rem; padding: 1rem 1.5rem; background: var(--surface);
+    border-top: 1px solid var(--border); position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  }
+  .stat { display: flex; flex-direction: column; align-items: center; flex: 1; }
+  .stat-val { font-family: var(--mono); font-size: 1rem; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .section-label { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.6rem; margin-top: 1.2rem; }
+
+  .vuln-item {
+    display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 0.5rem;
+  }
+  .vuln-item:hover { border-color: var(--warn); }
+  .vuln-item.done { opacity: 0.5; }
+  .vuln-name { font-size: 0.85rem; flex: 1; }
+  .vuln-item.done .vuln-name { text-decoration: line-through; color: var(--muted); }
+
+  .payout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .payout-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; text-align: center; }
+  .payout-platform { font-family: var(--mono); font-size: 0.75rem; color: var(--accent2); margin-bottom: 0.3rem; }
+  .payout-range { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); font-weight: 700; }
+  .payout-label { font-size: 0.65rem; color: var(--muted); margin-top: 0.2rem; }
+
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; text-align: center; }
+  .metric-val { font-family: var(--mono); font-size: 1.1rem; color: var(--accent2); font-weight: 700; }
+  .metric-label { font-size: 0.65rem; color: var(--muted); margin-top: 0.2rem; }
+
+  .callout {
+    border-left: 3px solid var(--danger); background: rgba(255,68,68,0.06); border-radius: 0 6px 6px 0;
+    padding: 0.9rem 1rem; margin-bottom: 1.2rem; font-size: 0.82rem; color: var(--text); line-height: 1.5;
+  }
+  .callout b { color: var(--danger); }
+
+  /* ---------- worlds ---------- */
+  .world { display: none; }
+  .world.active { display: block; }
+
+  /* ---------- home ---------- */
+  #world-home.active { display: block; }
+  .home-hero { padding: 3rem 1.5rem 2rem; max-width: 900px; margin: 0 auto; text-align: left; }
+  .home-hero h1 { font-size: clamp(1.6rem, 5vw, 2.3rem); color: var(--text); letter-spacing: 0.02em; margin-bottom: 0.6rem; }
+  .home-hero .accent-word { color: var(--accent); }
+  .home-hero p { color: var(--muted); font-family: var(--mono); font-size: 0.85rem; max-width: 60ch; }
+
+  .card-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+    max-width: 900px; margin: 2rem auto 4rem; padding: 0 1.5rem;
+  }
+  @media (max-width: 760px) { .card-grid { grid-template-columns: 1fr; } }
+
+  .world-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.5rem; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .world-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .world-card.card-bb::before { background: var(--accent); }
+  .world-card.card-soc::before { background: var(--accent2); }
+  .world-card.card-rt::before { background: var(--danger); }
+  .world-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px -12px rgba(0,0,0,0.6); }
+  .world-card.card-bb:hover { border-color: var(--accent); }
+  .world-card.card-soc:hover { border-color: var(--accent2); }
+  .world-card.card-rt:hover { border-color: var(--danger); }
+
+  .card-icon { font-size: 1.8rem; margin-bottom: 0.8rem; }
+  .card-title { font-family: var(--mono); font-size: 0.95rem; margin-bottom: 0.5rem; }
+  .card-bb .card-title { color: var(--accent); }
+  .card-soc .card-title { color: var(--accent2); }
+  .card-rt .card-title { color: var(--danger); }
+  .card-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.5; margin-bottom: 1rem; }
+  .card-enter { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; color: var(--text); }
+  .card-bb .card-enter { color: var(--accent); }
+  .card-soc .card-enter { color: var(--accent2); }
+  .card-rt .card-enter { color: var(--danger); }
+
+  .home-footnote {
+    max-width: 900px; margin: 0 auto 4rem; padding: 0 1.5rem;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--muted); line-height: 1.6;
+  }
+
+  /* ---------- google sign-in gate ---------- */
+  body.locked .world-nav, body.locked .world, body.locked .stats-bar { display: none !important; }
+
+  #gate-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
+  #gate-overlay.hidden { display: none; }
+
+  .gate-card {
+    width: 100%; max-width: 380px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; box-shadow: 0 20px 60px -20px rgba(0,0,0,0.7);
+  }
+  .gate-card .terminal-bar { padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+  .gate-body { padding: 1.6rem 1.5rem; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .gate-lock { font-size: 1.8rem; margin-bottom: 0.8rem; }
+  .gate-title { font-family: var(--mono); font-size: 1rem; color: var(--accent); margin-bottom: 0.3rem; }
+  .gate-sub { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-bottom: 1.4rem; }
+  .gate-error {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--danger);
+    margin-top: 0.9rem; min-height: 1em; display: none;
+  }
+  .gate-error.show { display: block; }
+  #g_id_signin_container { margin-top: 0.3rem; }
+  .gate-userchip {
+    display: flex; align-items: center; gap: 0.6rem;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 20px;
+    padding: 0.3rem 0.7rem 0.3rem 0.3rem; font-family: var(--mono); font-size: 0.7rem; color: var(--muted);
+  }
+  .gate-userchip img { width: 22px; height: 22px; border-radius: 50%; }
+  .signout-btn {
+    background: transparent; border: none; color: var(--muted); font-family: var(--mono);
+    font-size: 0.65rem; cursor: pointer; text-decoration: underline; margin-left: 0.4rem;
+  }
+</style>
+</head>
+<body class="locked">
+
+<div id="gate-overlay">
+  <div class="gate-card">
+    <div class="terminal-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span class="terminal-label">access-control — auth required</span>
+    </div>
+    <div class="gate-body">
+      <div class="gate-lock">🔒</div>
+      <div class="gate-title">// RESTRICTED ACCESS</div>
+      <div class="gate-sub">root@hub:~$ sign in with google to continue<span class="blink">█</span></div>
+      <div id="g_id_signin_container"></div>
+      <div class="gate-error" id="gate-error">✕ SIGN-IN FAILED — try again</div>
+    </div>
+  </div>
+</div>
+
+<nav class="world-nav">
+  <span class="world-logo" onclick="showWorld('home')">SEC<span style="color:var(--muted)">://</span>HUB</span>
+  <button class="world-btn" id="nav-home" onclick="showWorld('home')">HOME</button>
+  <button class="world-btn" id="nav-bb" onclick="showWorld('bb')">BUG BOUNTY</button>
+  <button class="world-btn" id="nav-soc" onclick="showWorld('soc')">SOC</button>
+  <button class="world-btn" id="nav-rt" onclick="showWorld('rt')">RED TEAM</button>
+  <span style="flex:1"></span>
+  <div class="gate-userchip" id="user-chip" style="display:none;">
+    <img id="user-avatar" src="" alt="">
+    <span id="user-name"></span>
+    <button class="signout-btn" onclick="signOut()">sign out</button>
+  </div>
+</nav>
+
+<!-- ======================= HOME ======================= -->
+<div class="world active" id="world-home">
+  <div class="home-hero">
+    <h1>Three disciplines. <span class="accent-word">One console.</span></h1>
+    <p>root@hub:~$ select a framework to load its methodology, checklist and tracker<span class="blink">█</span></p>
+  </div>
+
+  <div class="card-grid">
+    <div class="world-card card-bb" onclick="showWorld('bb')">
+      <div class="card-icon">🎯</div>
+      <div class="card-title">// BUG BOUNTY</div>
+      <div class="card-desc">Researcher workflow: recon → scan → vuln ID → exploit-to-prove → report → earn. Track findings and build submissions.</div>
+      <div class="card-enter">ENTER →</div>
+    </div>
+    <div class="world-card card-soc" onclick="showWorld('soc')">
+      <div class="card-icon">🛡️</div>
+      <div class="card-title">// SOC OPERATIONS</div>
+      <div class="card-desc">Defender's cycle: monitor → triage → investigate → contain → recover → report. The daily loop of an analyst.</div>
+      <div class="card-enter">ENTER →</div>
+    </div>
+    <div class="world-card card-rt" onclick="showWorld('rt')">
+      <div class="card-icon">⚔️</div>
+      <div class="card-title">// RED TEAM</div>
+      <div class="card-desc">Authorized adversary simulation: scope → recon → access planning → pivot → objective → debrief with the blue team.</div>
+      <div class="card-enter">ENTER →</div>
+    </div>
+  </div>
+
+  <div class="home-footnote">
+    All three frameworks assume written authorization and defined scope before any technical action.<br>
+    Bug bounty = external researcher, program rules. Red team = internal/contracted, signed ROE. SOC = defense, always authorized by role.
+  </div>
+</div>
+
+<!-- ======================= BUG BOUNTY ======================= -->
+<div class="world world-bb" id="world-bb">
+  <header>
+    <div class="terminal-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span class="terminal-label">bug-bounty-framework v1.0 — root@hunter:~$<span class="blink">█</span></span>
+    </div>
+    <h1 class="c-bb">// BUG BOUNTY FRAMEWORK</h1>
+    <div class="subtitle">Your personal hunting methodology — track, check, report, earn.</div>
+  </header>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span>OVERALL PROGRESS</span><span id="bb-progress-pct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="bb-progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <nav class="phase-nav">
+    <button class="phase-tab active" onclick="switchPhase('bb',0)"><span class="phase-num">01</span> RECON</button>
+    <button class="phase-tab" onclick="switchPhase('bb',1)"><span class="phase-num">02</span> SCAN</button>
+    <button class="phase-tab" onclick="switchPhase('bb',2)"><span class="phase-num">03</span> VULNS</button>
+    <button class="phase-tab" onclick="switchPhase('bb',3)"><span class="phase-num">04</span> EXPLOIT</button>
+    <button class="phase-tab" onclick="switchPhase('bb',4)"><span class="phase-num">05</span> REPORT</button>
+    <button class="phase-tab" onclick="switchPhase('bb',5)"><span class="phase-num">06</span> EARN</button>
+  </nav>
+
+  <div class="content">
+
+    <div class="phase-panel active" id="bb-panel-0">
+      <div class="phase-header">
+        <div class="phase-icon">🔍</div>
+        <div>
+          <div class="phase-title">RECONNAISSANCE</div>
+          <div class="phase-desc">Gather maximum information about the target before touching it. The more you know, the bigger the attack surface.</div>
+        </div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Enumerate all subdomains</div><div class="check-tool">Tools: Subfinder, Amass, Sublist3r, Assetfinder</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Screenshot all discovered web assets</div><div class="check-tool">Tools: Aquatone, Eyewitness, GoWitness</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Identify technologies and frameworks</div><div class="check-tool">Tools: Wappalyzer, WhatWeb, BuiltWith</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Find emails and employee names (OSINT)</div><div class="check-tool">Tools: theHarvester, Hunter.io, LinkedIn</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Check DNS records (MX, TXT, CNAME)</div><div class="check-tool">Tools: dig, dnsx, MXToolbox</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Search GitHub for leaked secrets/code</div><div class="check-tool">Tools: GitDorker, TruffleHog, GitHub Search</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Google dorking for exposed files</div><div class="check-tool">Dorks: site:target.com filetype:pdf, inurl:admin, etc.</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Check Wayback Machine for old endpoints</div><div class="check-tool">Tools: waybackurls, gau, waymore</div></div></div>
+      </div>
+      <div class="section-label">Key Tools</div>
+      <div class="tools-grid">
+        <div class="tool-card">Subfinder<div class="tool-purpose">Subdomain enum</div></div>
+        <div class="tool-card">Amass<div class="tool-purpose">Deep recon</div></div>
+        <div class="tool-card">theHarvester<div class="tool-purpose">OSINT gathering</div></div>
+        <div class="tool-card">WhatWeb<div class="tool-purpose">Tech fingerprint</div></div>
+        <div class="tool-card">waybackurls<div class="tool-purpose">Old URLs</div></div>
+        <div class="tool-card">GitDorker<div class="tool-purpose">GitHub leaks</div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="bb-panel-1">
+      <div class="phase-header">
+        <div class="phase-icon">📡</div>
+        <div>
+          <div class="phase-title">SCANNING & ENUMERATION</div>
+          <div class="phase-desc">Dig deeper. Find open ports, hidden directories, login panels, and API endpoints.</div>
+        </div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Port scan all discovered hosts</div><div class="check-tool">Tools: Nmap, Masscan, RustScan</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Directory and file brute-forcing</div><div class="check-tool">Tools: Gobuster, Feroxbuster, Dirsearch</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Extract all API endpoints from JS files</div><div class="check-tool">Tools: LinkFinder, JSParser, relative-url-extractor</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Run automated web scanner</div><div class="check-tool">Tools: Nikto, Nuclei templates</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Intercept all traffic through proxy</div><div class="check-tool">Tools: Burp Suite, OWASP ZAP</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Find login panels and admin interfaces</div><div class="check-tool">Manual search + Gobuster /admin /login /dashboard</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Check for exposed config/env files</div><div class="check-tool">Look for .env, config.php, web.config, .git</div></div></div>
+      </div>
+      <div class="section-label">Key Tools</div>
+      <div class="tools-grid">
+        <div class="tool-card">Nmap<div class="tool-purpose">Port scanning</div></div>
+        <div class="tool-card">Burp Suite<div class="tool-purpose">Traffic proxy</div></div>
+        <div class="tool-card">Gobuster<div class="tool-purpose">Dir brute force</div></div>
+        <div class="tool-card">Nuclei<div class="tool-purpose">Auto scanner</div></div>
+        <div class="tool-card">LinkFinder<div class="tool-purpose">JS endpoints</div></div>
+        <div class="tool-card">Nikto<div class="tool-purpose">Web scanner</div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="bb-panel-2">
+      <div class="phase-header">
+        <div class="phase-icon">⚠️</div>
+        <div>
+          <div class="phase-title">VULNERABILITY IDENTIFICATION</div>
+          <div class="phase-desc">Hunt for real bugs. Test methodically — check each vulnerability class on every endpoint.</div>
+        </div>
+      </div>
+      <div class="section-label">Vulnerability Checklist (by severity)</div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-critical">CRITICAL</span><span class="vuln-name">SQL Injection (SQLi)</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-critical">CRITICAL</span><span class="vuln-name">Remote Code Execution (RCE)</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-critical">CRITICAL</span><span class="vuln-name">Server Side Request Forgery (SSRF)</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-high">HIGH</span><span class="vuln-name">Insecure Direct Object Reference (IDOR)</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-high">HIGH</span><span class="vuln-name">Broken Authentication / Session Management</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-high">HIGH</span><span class="vuln-name">XML External Entity (XXE) Injection</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-high">HIGH</span><span class="vuln-name">Subdomain Takeover</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-medium">MEDIUM</span><span class="vuln-name">Cross-Site Scripting (XSS)</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-medium">MEDIUM</span><span class="vuln-name">Cross-Site Request Forgery (CSRF)</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-medium">MEDIUM</span><span class="vuln-name">Sensitive Data Exposure</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-medium">MEDIUM</span><span class="vuln-name">Business Logic Errors</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-low">LOW</span><span class="vuln-name">Open Redirect</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-low">LOW</span><span class="vuln-name">Missing Security Headers</span></div>
+      <div class="vuln-item" onclick="toggleVuln(this)"><span class="severity sev-low">LOW</span><span class="vuln-name">Clickjacking</span></div>
+    </div>
+
+    <div class="phase-panel" id="bb-panel-3">
+      <div class="phase-header">
+        <div class="phase-icon">💀</div>
+        <div>
+          <div class="phase-title">EXPLOITATION</div>
+          <div class="phase-desc">Safely prove the vulnerability is real. Document everything. Never cause damage.</div>
+        </div>
+      </div>
+      <div class="section-label">Rules of Engagement</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Confirm target is IN SCOPE before testing</div><div class="check-tool">Read the program policy carefully on HackerOne/Bugcrowd</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Only exploit to prove impact — no destructive actions</div><div class="check-tool">Never delete data, deface, or access more than needed to prove the bug</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Record your screen while exploiting</div><div class="check-tool">Tools: OBS Studio, Loom, ShareX — video proof is gold</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Take detailed screenshots at every step</div><div class="check-tool">Include request/response, payloads used, and impact shown</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Save all Burp Suite request logs</div><div class="check-tool">Export as XML for inclusion in report</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Note exact payload and reproduction steps</div><div class="check-tool">Must be reproducible by the triage team</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Assess real-world impact of the bug</div><div class="check-tool">What could a malicious attacker actually do with this?</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="bb-panel-4">
+      <div class="phase-header">
+        <div class="phase-icon">📝</div>
+        <div>
+          <div class="phase-title">BUG REPORT TEMPLATE</div>
+          <div class="phase-desc">A great report = faster triage + higher payout. Fill this out before submitting.</div>
+        </div>
+      </div>
+      <div class="report-block"><div class="report-block-header">📌 TITLE — Clear, specific, one line</div><textarea placeholder="e.g. IDOR on /api/v1/users/{id} allows accessing other users' private data"></textarea></div>
+      <div class="report-block"><div class="report-block-header">🎯 SEVERITY — Critical / High / Medium / Low</div><textarea placeholder="Severity: HIGH&#10;CVSS Score: 8.1&#10;Reason: Attacker can access any user's private profile data without authentication"></textarea></div>
+      <div class="report-block"><div class="report-block-header">📋 DESCRIPTION — What is the vulnerability?</div><textarea placeholder="Describe the vulnerability clearly. What is broken? Why is it a security issue? What component is affected?"></textarea></div>
+      <div class="report-block"><div class="report-block-header">🔄 STEPS TO REPRODUCE — Exact steps (must be reproducible)</div><textarea placeholder="1. Log in as user A&#10;2. Intercept request with Burp Suite&#10;3. Change user ID&#10;4. Observe unauthorized data returned"></textarea></div>
+      <div class="report-block"><div class="report-block-header">💥 IMPACT — What can an attacker do?</div><textarea placeholder="Describe the real-world consequence and scale of affected users."></textarea></div>
+      <div class="report-block"><div class="report-block-header">🔧 SUGGESTED FIX — How to patch it</div><textarea placeholder="Recommend the specific authorization/validation check that closes the gap."></textarea></div>
+      <div class="report-block"><div class="report-block-header">📎 PROOF — Evidence (screenshots, video, logs)</div><textarea placeholder="[Screenshot 1]... [Video]... [Burp XML]..."></textarea></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="bb-copy-btn" onclick="copyReport('bb')">⬇ COPY REPORT</button>
+        <button class="btn btn-secondary" onclick="clearReport('bb')">✕ CLEAR ALL</button>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="bb-panel-5">
+      <div class="phase-header">
+        <div class="phase-icon">💰</div>
+        <div>
+          <div class="phase-title">EARN — PLATFORMS & PAYOUTS</div>
+          <div class="phase-desc">Where to submit your bugs and how much you can earn per severity level.</div>
+        </div>
+      </div>
+      <div class="section-label">Top Bug Bounty Platforms</div>
+      <div class="payout-grid">
+        <div class="payout-card"><div class="payout-platform">HackerOne</div><div class="payout-range">$50 — $300,000+</div><div class="payout-label">hackerone.com</div></div>
+        <div class="payout-card"><div class="payout-platform">Bugcrowd</div><div class="payout-range">$50 — $100,000+</div><div class="payout-label">bugcrowd.com</div></div>
+        <div class="payout-card"><div class="payout-platform">Intigriti</div><div class="payout-range">€100 — €50,000+</div><div class="payout-label">intigriti.com</div></div>
+        <div class="payout-card"><div class="payout-platform">Google VRP</div><div class="payout-range">$100 — $31,337</div><div class="payout-label">bughunters.google.com</div></div>
+      </div>
+      <div class="section-label">Typical Payouts by Severity</div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-critical">CRITICAL</span><span class="vuln-name">$5,000 — $300,000+</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-high">HIGH</span><span class="vuln-name">$1,000 — $10,000</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-medium">MEDIUM</span><span class="vuln-name">$200 — $2,000</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-low">LOW</span><span class="vuln-name">$50 — $500</span></div>
+      <div class="section-label">Submit Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Verify bug is in scope one final time</div><div class="check-tool">Re-read the program policy before submitting</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Report is clear and reproducible</div><div class="check-tool">Ask yourself — can a stranger reproduce this from your steps?</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">All proof attached (screenshots + video)</div><div class="check-tool">Video proof dramatically increases payout speed</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Impact is clearly described</div><div class="check-tool">Triage teams pay more when impact is well explained</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Suggested fix included</div><div class="check-tool">Shows professionalism — often leads to bonus</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================= SOC ======================= -->
+<div class="world world-soc" id="world-soc">
+  <header>
+    <div class="terminal-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span class="terminal-label">soc-framework v1.0 — analyst@soc:~$<span class="blink">█</span></span>
+    </div>
+    <h1 class="c-soc">// SOC OPERATIONS FRAMEWORK</h1>
+    <div class="subtitle">The defender's cycle — monitor, triage, investigate, contain, recover, improve.</div>
+  </header>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span>OVERALL PROGRESS</span><span id="soc-progress-pct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="soc-progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <nav class="phase-nav">
+    <button class="phase-tab active" onclick="switchPhase('soc',0)"><span class="phase-num">01</span> MONITOR</button>
+    <button class="phase-tab" onclick="switchPhase('soc',1)"><span class="phase-num">02</span> TRIAGE</button>
+    <button class="phase-tab" onclick="switchPhase('soc',2)"><span class="phase-num">03</span> INVESTIGATE</button>
+    <button class="phase-tab" onclick="switchPhase('soc',3)"><span class="phase-num">04</span> CONTAIN</button>
+    <button class="phase-tab" onclick="switchPhase('soc',4)"><span class="phase-num">05</span> RECOVER</button>
+    <button class="phase-tab" onclick="switchPhase('soc',5)"><span class="phase-num">06</span> REPORT</button>
+  </nav>
+
+  <div class="content">
+
+    <div class="phase-panel active" id="soc-panel-0">
+      <div class="phase-header">
+        <div class="phase-icon">📊</div>
+        <div><div class="phase-title">MONITOR & DETECT</div><div class="phase-desc">Continuous visibility across the environment. You can't respond to what you can't see.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Review SIEM dashboard for the shift</div><div class="check-tool">Check alert queue, open incidents, and health of log ingestion</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Verify all critical log sources are reporting</div><div class="check-tool">EDR, firewall, DNS, proxy, auth/IdP, cloud audit logs</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Tune noisy detection rules</div><div class="check-tool">Reduce false-positive rate without losing true-positive coverage</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Review threat intel feed for new IOCs</div><div class="check-tool">Cross-reference against internal telemetry</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Baseline normal traffic and user behavior</div><div class="check-tool">Needed so anomalies actually stand out</div></div></div>
+      </div>
+      <div class="section-label">Key Tools</div>
+      <div class="tools-grid">
+        <div class="tool-card">Splunk<div class="tool-purpose">SIEM / log search</div></div>
+        <div class="tool-card">Elastic (ELK)<div class="tool-purpose">Log aggregation</div></div>
+        <div class="tool-card">Microsoft Sentinel<div class="tool-purpose">Cloud SIEM</div></div>
+        <div class="tool-card">CrowdStrike<div class="tool-purpose">EDR telemetry</div></div>
+        <div class="tool-card">Suricata / Zeek<div class="tool-purpose">Network IDS</div></div>
+        <div class="tool-card">MISP<div class="tool-purpose">Threat intel</div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="soc-panel-1">
+      <div class="phase-header">
+        <div class="phase-icon">🚨</div>
+        <div><div class="phase-title">TRIAGE & PRIORITIZE</div><div class="phase-desc">An alert fires. Decide fast: noise, or something that needs a human right now.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Confirm the alert isn't a known false positive</div><div class="check-tool">Check suppression list and prior similar alerts</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Assign severity (P1–P4)</div><div class="check-tool">Based on asset criticality + potential blast radius</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Check asset criticality (crown jewel vs. low-value)</div><div class="check-tool">A workstation alert ≠ a domain controller alert</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Correlate with other alerts in the same window</div><div class="check-tool">One alert alone may be noise; three together may be a chain</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Log the initial assessment and open a case</div><div class="check-tool">Tools: TheHive, Jira, ServiceNow SecOps</div></div></div>
+      </div>
+      <div class="section-label">Severity Guide</div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-critical">P1</span><span class="vuln-name">Active compromise on critical asset — respond now</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-high">P2</span><span class="vuln-name">Confirmed malicious activity, contained blast radius</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-medium">P3</span><span class="vuln-name">Suspicious but unconfirmed — needs investigation</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-low">P4</span><span class="vuln-name">Low-risk / policy violation — routine handling</span></div>
+    </div>
+
+    <div class="phase-panel" id="soc-panel-2">
+      <div class="phase-header">
+        <div class="phase-icon">🔬</div>
+        <div><div class="phase-title">INVESTIGATE</div><div class="phase-desc">Establish what actually happened: entry point, scope, and root cause.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Pull logs from the affected host(s)</div><div class="check-tool">Process, network, auth, and file-system events</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Reconstruct the process/execution timeline</div><div class="check-tool">Tools: EDR console, Velociraptor, KAPE</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Identify indicators of compromise (IOCs)</div><div class="check-tool">Hashes, IPs, domains, registry keys, scheduled tasks</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Check for lateral movement</div><div class="check-tool">Review auth logs across other hosts for the same IOCs</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Map activity to MITRE ATT&CK techniques</div><div class="check-tool">Helps standardize the incident narrative</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Determine full scope of compromise</div><div class="check-tool">Every account, host, and data set touched</div></div></div>
+      </div>
+      <div class="section-label">Key Tools</div>
+      <div class="tools-grid">
+        <div class="tool-card">Velociraptor<div class="tool-purpose">Live forensics</div></div>
+        <div class="tool-card">KAPE<div class="tool-purpose">Artifact collection</div></div>
+        <div class="tool-card">Volatility<div class="tool-purpose">Memory forensics</div></div>
+        <div class="tool-card">Defender/CrowdStrike<div class="tool-purpose">EDR timeline</div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="soc-panel-3">
+      <div class="phase-header">
+        <div class="phase-icon">🧯</div>
+        <div><div class="phase-title">CONTAIN & ERADICATE</div><div class="phase-desc">Stop the bleeding, then remove the cause completely — not just the symptom.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Isolate affected host(s) from the network</div><div class="check-tool">EDR network isolation, not full shutdown (preserve evidence)</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Block malicious IOCs at perimeter</div><div class="check-tool">Firewall, proxy, DNS sinkhole, WAF rules</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Disable or reset compromised accounts</div><div class="check-tool">Force password reset + revoke active sessions/tokens</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Remove persistence mechanisms</div><div class="check-tool">Scheduled tasks, services, registry run keys, cron jobs</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Patch or close the exploited vulnerability</div><div class="check-tool">Confirm the entry point can't be reused</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="soc-panel-4">
+      <div class="phase-header">
+        <div class="phase-icon">♻️</div>
+        <div><div class="phase-title">RECOVER & VALIDATE</div><div class="phase-desc">Bring systems back carefully, and prove the threat is actually gone.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Restore from a known-clean backup</div><div class="check-tool">Verify backup predates the compromise</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Monitor restored systems for reinfection</div><div class="check-tool">Heightened alerting for 1–2 weeks post-incident</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Validate systems are clean before reconnecting</div><div class="check-tool">Full AV/EDR scan + integrity check</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Gradually restore user access</div><div class="check-tool">Staged rollout, not all-at-once</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Confirm normal business operations resumed</div><div class="check-tool">Sign-off from affected business unit</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="soc-panel-5">
+      <div class="phase-header">
+        <div class="phase-icon">📈</div>
+        <div><div class="phase-title">REPORT & IMPROVE</div><div class="phase-desc">Every incident should make the next one faster to catch and easier to stop.</div></div>
+      </div>
+      <div class="section-label">Key Metrics</div>
+      <div class="metric-grid">
+        <div class="metric-card"><div class="metric-val">MTTD</div><div class="metric-label">Mean time to detect</div></div>
+        <div class="metric-card"><div class="metric-val">MTTR</div><div class="metric-label">Mean time to respond</div></div>
+        <div class="metric-card"><div class="metric-val">Alert Vol.</div><div class="metric-label">Alerts per shift</div></div>
+        <div class="metric-card"><div class="metric-val">FP Rate</div><div class="metric-label">False positive %</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Write the full incident timeline</div><div class="check-tool">Detection → triage → containment → recovery, with timestamps</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Calculate MTTD / MTTR for this incident</div><div class="check-tool">Compare against team baseline</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Update or create detection rules</div><div class="check-tool">Close the gap that let this slip through initially</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Run a blameless lessons-learned session</div><div class="check-tool">What worked, what didn't, what's changing</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Update runbooks with new findings</div><div class="check-tool">So the next analyst doesn't start from zero</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================= RED TEAM ======================= -->
+<div class="world world-rt" id="world-rt">
+  <header>
+    <div class="terminal-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span class="terminal-label">redteam-framework v1.0 — operator@rt:~$<span class="blink">█</span></span>
+    </div>
+    <h1 class="c-rt">// RED TEAM ENGAGEMENT FRAMEWORK</h1>
+    <div class="subtitle">Authorized adversary simulation — scoped, objective-driven, always debriefed with the defenders.</div>
+  </header>
+
+  <div class="callout" style="margin:1rem 1.5rem 0;"><b>Authorization is the first control.</b> Every phase below assumes a signed Rules of Engagement (ROE) and written client authorization. No ROE, no engagement — full stop.</div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span>OVERALL PROGRESS</span><span id="rt-progress-pct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="rt-progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <nav class="phase-nav">
+    <button class="phase-tab active" onclick="switchPhase('rt',0)"><span class="phase-num">01</span> SCOPE</button>
+    <button class="phase-tab" onclick="switchPhase('rt',1)"><span class="phase-num">02</span> RECON</button>
+    <button class="phase-tab" onclick="switchPhase('rt',2)"><span class="phase-num">03</span> ACCESS PLAN</button>
+    <button class="phase-tab" onclick="switchPhase('rt',3)"><span class="phase-num">04</span> PIVOT</button>
+    <button class="phase-tab" onclick="switchPhase('rt',4)"><span class="phase-num">05</span> OBJECTIVE</button>
+    <button class="phase-tab" onclick="switchPhase('rt',5)"><span class="phase-num">06</span> DEBRIEF</button>
+  </nav>
+
+  <div class="content">
+
+    <div class="phase-panel active" id="rt-panel-0">
+      <div class="phase-header">
+        <div class="phase-icon">📜</div>
+        <div><div class="phase-title">SCOPE & RULES OF ENGAGEMENT</div><div class="phase-desc">Define what "success" means, what's off-limits, and who to call if something goes wrong.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Get written authorization signed by the client</div><div class="check-tool">Must name the engaging party with authority to authorize testing</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Define engagement objectives</div><div class="check-tool">e.g. reach domain admin, access a specific data store, test detection response</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Define in-scope and explicitly off-limits systems</div><div class="check-tool">Production vs. staging, third-party systems, physical sites</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Agree testing style: black box, grey box, or assumed breach</div><div class="check-tool">Determines starting knowledge/access level</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Set an emergency stop procedure and contact</div><div class="check-tool">Who can call off the engagement immediately, and how</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Agree whether the SOC will be notified in advance</div><div class="check-tool">Announced test vs. purple team vs. true no-notice</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="rt-panel-1">
+      <div class="phase-header">
+        <div class="phase-icon">🕵️</div>
+        <div><div class="phase-title">RECONNAISSANCE & OSINT</div><div class="phase-desc">Map the organization the way a real adversary would — passively, before any active step.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Map external footprint (domains, IP ranges, cloud assets)</div><div class="check-tool">Passive recon only at this stage</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Identify technology stack and third-party vendors</div><div class="check-tool">Informs which technique categories are realistic</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Identify employees/roles relevant to the objective</div><div class="check-tool">Only if social engineering is explicitly in scope</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Review public breach data and leaked credentials</div><div class="check-tool">Understand what's already exposed, don't use illegally obtained data</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Build a target profile document</div><div class="check-tool">Shared internally with the team, never with unauthorized parties</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="rt-panel-2">
+      <div class="phase-header">
+        <div class="phase-icon">🔑</div>
+        <div><div class="phase-title">INITIAL ACCESS PLANNING</div><div class="phase-desc">Decide which vector fits the agreed scope and objective — plan it, get sign-off, then execute within ROE.</div></div>
+      </div>
+      <div class="section-label">Vector Categories (only if authorized in ROE)</div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-high">EXTERNAL</span><span class="vuln-name">Exploiting an in-scope external vulnerability</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-medium">SOCIAL</span><span class="vuln-name">Phishing simulation, if explicitly scoped</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-medium">PHYSICAL</span><span class="vuln-name">On-site social engineering / badge testing, if scoped</span></div>
+      <div class="vuln-item" style="cursor:default"><span class="severity sev-low">CREDENTIAL</span><span class="vuln-name">Password spraying against exposed services, rate-limited</span></div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Confirm chosen vector is explicitly within ROE</div><div class="check-tool">No vector is assumed in-scope by default</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Get final go/no-go sign-off before execution</div><div class="check-tool">Especially for social engineering or physical vectors</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Log every action with timestamps</div><div class="check-tool">Required for the final report and any SOC correlation later</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="rt-panel-3">
+      <div class="phase-header">
+        <div class="phase-icon">🧭</div>
+        <div><div class="phase-title">PERSISTENCE & LATERAL MOVEMENT</div><div class="phase-desc">Move toward the objective the way a patient adversary would, while staying inside the agreed boundaries.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Maintain access only within scoped systems</div><div class="check-tool">Never pivot into explicitly excluded assets</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Map the path toward the objective, not every possible host</div><div class="check-tool">Efficiency matters — this isn't a full network compromise</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Respect any agreed detection thresholds</div><div class="check-tool">In purple team exercises, deliberately trigger specific detections</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Document each step against MITRE ATT&CK</div><div class="check-tool">Makes the final report directly actionable for the SOC</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Avoid any destructive or data-exfiltrating action</div><div class="check-tool">Proof of access is enough — never remove real data</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="rt-panel-4">
+      <div class="phase-header">
+        <div class="phase-icon">🏁</div>
+        <div><div class="phase-title">OBJECTIVE & IMPACT DEMONSTRATION</div><div class="phase-desc">Reach the agreed goal, capture proof, then stop.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Confirm the objective as defined in scope has been reached</div><div class="check-tool">e.g. domain admin, access to defined data store</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Capture minimal proof of impact</div><div class="check-tool">Screenshot/log evidence — not bulk data extraction</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Stop active testing once objective is proven</div><div class="check-tool">Continuing further adds risk without adding value</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Begin cleanup of any implants/access used</div><div class="check-tool">Track everything so nothing is left behind post-engagement</div></div></div>
+      </div>
+    </div>
+
+    <div class="phase-panel" id="rt-panel-5">
+      <div class="phase-header">
+        <div class="phase-icon">🤝</div>
+        <div><div class="phase-title">REPORTING & PURPLE TEAM DEBRIEF</div><div class="phase-desc">The engagement's real value: what the defenders learn from it.</div></div>
+      </div>
+      <div class="section-label">Checklist</div>
+      <div class="checklist">
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Write the full attack narrative / kill chain</div><div class="check-tool">Every step, mapped to MITRE ATT&CK</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">List concrete remediation recommendations</div><div class="check-tool">Prioritized by what would have stopped the chain earliest</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Confirm all access and implants were fully removed</div><div class="check-tool">Sign-off from both red team and client IT</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Hold a purple team debrief with the SOC</div><div class="check-tool">Walk through what was/wasn't detected, and why</div></div></div>
+        <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="check-text"><div class="check-title">Hand off detection gap list to the SOC for tuning</div><div class="check-tool">Closes the loop between red and blue</div></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================= STATS BAR ======================= -->
+<div class="stats-bar" id="stats-bar" style="display:none;">
+  <div class="stat"><div class="stat-val" id="stat-done">0</div><div class="stat-label">Done</div></div>
+  <div class="stat"><div class="stat-val" id="stat-total">0</div><div class="stat-label">Total</div></div>
+  <div class="stat"><div class="stat-val" id="stat-vulns">0</div><div class="stat-label">Flagged</div></div>
+  <div class="stat"><div class="stat-val" id="stat-phase">1/6</div><div class="stat-label">Phase</div></div>
+</div>
+
+<script>
+  const worlds = ['bb','soc','rt'];
+  let currentWorld = 'home';
+  const currentPhase = { bb: 0, soc: 0, rt: 0 };
+  const totalPhases = 6;
+
+  function showWorld(name) {
+    currentWorld = name;
+    document.querySelectorAll('.world').forEach(w => w.classList.remove('active'));
+    document.getElementById('world-' + name).classList.add('active');
+
+    document.querySelectorAll('.world-btn').forEach(b => b.classList.remove('active-bb','active-soc','active-rt'));
+    if (name !== 'home') {
+      document.getElementById('nav-' + name).classList.add('active-' + name);
+    }
+
+    const statsBar = document.getElementById('stats-bar');
+    if (name === 'home') {
+      statsBar.style.display = 'none';
+    } else {
+      statsBar.style.display = 'flex';
+      updateStats();
+    }
+    window.scrollTo({top: 0, behavior: 'instant' in window ? 'instant' : 'auto'});
+  }
+
+  function switchPhase(world, idx) {
+    const container = document.getElementById('world-' + world);
+    container.querySelectorAll('.phase-panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+    container.querySelectorAll('.phase-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+    currentPhase[world] = idx;
+    updateStats();
+  }
+
+  function toggleCheck(el) {
+    el.classList.toggle('done');
+    const cb = el.querySelector('.checkbox');
+    cb.textContent = el.classList.contains('done') ? '✓' : '';
+    updateStats();
+  }
+
+  function toggleVuln(el) {
+    el.classList.toggle('done');
+    updateStats();
+  }
+
+  function updateStats() {
+    if (currentWorld === 'home') return;
+    const container = document.getElementById('world-' + currentWorld);
+    const allChecks = container.querySelectorAll('.check-item');
+    const doneChecks = container.querySelectorAll('.check-item.done');
+    const doneVulns = container.querySelectorAll('.vuln-item.done');
+
+    const total = allChecks.length;
+    const done = doneChecks.length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    document.getElementById('stat-done').textContent = done;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-vulns').textContent = doneVulns.length;
+    document.getElementById('stat-phase').textContent = `${currentPhase[currentWorld] + 1}/${totalPhases}`;
+
+    const fill = document.getElementById(currentWorld + '-progress-fill');
+    const label = document.getElementById(currentWorld + '-progress-pct');
+    if (fill) fill.style.width = pct + '%';
+    if (label) label.textContent = pct + '%';
+  }
+
+  function copyReport(world) {
+    const panel = document.getElementById(world + '-panel-4');
+    const areas = panel.querySelectorAll('textarea');
+    const headers = panel.querySelectorAll('.report-block-header');
+    let report = '=== BUG BOUNTY REPORT ===\n\n';
+    headers.forEach((h, i) => {
+      report += h.textContent.trim() + '\n';
+      report += (areas[i].value || '(empty)');
+      report += '\n\n';
+    });
+    navigator.clipboard.writeText(report).then(() => {
+      const btn = document.getElementById(world + '-copy-btn');
+      const original = btn.textContent;
+      btn.textContent = '✓ COPIED!';
+      setTimeout(() => btn.textContent = original, 2000);
+    });
+  }
+
+  function clearReport(world) {
+    document.getElementById(world + '-panel-4').querySelectorAll('textarea').forEach(t => t.value = '');
+  }
+
+  /* ---------- Google Sign-In gate ---------- */
+  // 1. Create an OAuth Client ID at https://console.cloud.google.com/apis/credentials
+  //    (Application type: "Web application")
+  // 2. Add this site's URL under "Authorized JavaScript origins" (e.g. https://yourname.github.io)
+  // 3. Paste the Client ID below.
+  const GOOGLE_CLIENT_ID = "463273519479-3u2jkd9bbolbm8v6s9t560e270s1hnbf.apps.googleusercontent.com";
+
+  // Optional: restrict access to specific accounts only.
+  // Leave empty [] to allow any Google account to sign in.
+  const ALLOWED_EMAILS = []; // e.g. ["you@gmail.com", "teammate@gmail.com"]
+
+  function decodeJwt(token) {
+    try {
+      const payload = token.split('.')[1];
+      return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    } catch (e) { return null; }
+  }
+
+  function handleCredentialResponse(response) {
+    const profile = decodeJwt(response.credential);
+    const errEl = document.getElementById('gate-error');
+    if (!profile) { errEl.classList.add('show'); return; }
+
+    if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(profile.email)) {
+      errEl.textContent = '✕ ACCESS DENIED — this account is not authorized';
+      errEl.classList.add('show');
+      return;
+    }
+
+    errEl.classList.remove('show');
+    sessionStorage.setItem('sec_hub_user', JSON.stringify({
+      name: profile.name, email: profile.email, picture: profile.picture
+    }));
+    unlockSite(profile);
+  }
+
+  function unlockSite(profile) {
+    document.body.classList.remove('locked');
+    document.getElementById('gate-overlay').classList.add('hidden');
+    document.getElementById('user-chip').style.display = 'flex';
+    document.getElementById('user-avatar').src = profile.picture || '';
+    document.getElementById('user-name').textContent = profile.name || profile.email || 'signed in';
+    showWorld('home');
+  }
+
+  function signOut() {
+    sessionStorage.removeItem('sec_hub_user');
+    document.getElementById('user-chip').style.display = 'none';
+    document.body.classList.add('locked');
+    document.getElementById('gate-overlay').classList.remove('hidden');
+    if (window.google && google.accounts && google.accounts.id) {
+      google.accounts.id.disableAutoSelect();
+    }
+  }
+
+  window.onload = function () {
+    const saved = sessionStorage.getItem('sec_hub_user');
+    if (saved) {
+      unlockSite(JSON.parse(saved));
+      return;
+    }
+    if (window.google && google.accounts && google.accounts.id) {
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('g_id_signin_container'),
+        { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with' }
+      );
+    } else {
+      document.getElementById('gate-error').textContent = '✕ Google sign-in failed to load — check your connection';
+      document.getElementById('gate-error').classList.add('show');
+    }
+  };
+</script>
+</body>
+</html>
